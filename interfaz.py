@@ -23,7 +23,8 @@ class CajaInicial:
         if datos[2] in self.caja:
             self.caja[datos[2]] += datos[3]
         
-
+    def datos(self):
+        return f'caja actual: {self.caja}'
 
 
 # Interfaz principal
@@ -110,12 +111,6 @@ def interfaz_venta(page: ft.Page, caja_inicial):
             page.update()
 
 
-
-        # Mostrar los valores en la consola (o procesarlos)
-        print(f"Moneda comprada: {moneda_comprada}")
-        print(f"Cantidad comprada: {cantidad_comprada}")
-        print(f"Moneda dada: {moneda_dada}")
-        print(f"Tipo de cambio: {tipo_cambio}")
         page.controls.clear()  # Limpiar los controles previos
         interfaz_confirmar_venta(page)
         page.update()
@@ -156,7 +151,7 @@ def interfaz_venta(page: ft.Page, caja_inicial):
         ft.Text("Ingrese el tipo de cambio:", size=30, color=ft.Colors.BLACK),
     ]
 
-    monedas = ["Dolar", "Peso Argentino", "Euro", "Chileno"]
+    monedas = ["Dolar", "Pesos Argentinos", "Euro", "Chileno"]
 
     datos = [
         ft.Dropdown(label="Opciones", options=[ft.dropdown.Option(moneda) for moneda in monedas], border_radius=8),
@@ -182,7 +177,7 @@ def interfaz_venta(page: ft.Page, caja_inicial):
 def interfaz_compra(page: ft.Page, caja_inicial):
     def compra(moneda_comprada,cantidad_comprada,moneda_vendida,tipo_cambio):
         caja_final = caja_inicial.operacion_compra(moneda_comprada,cantidad_comprada,moneda_vendida,tipo_cambio)
-        caja_inicial.cambio_caja_venta(caja_final)
+        caja_inicial.cambio_caja_compra(caja_final)
         return caja_final[3]
     def ir_a_confirmacion(e):
         # Obtener los valores de los inputs antes de continuar
@@ -205,7 +200,7 @@ def interfaz_compra(page: ft.Page, caja_inicial):
 
     def retroceder(e):
         page.controls.clear()  # Limpiar los controles previos
-        main(page,caja_inicial)
+        main(page)
         page.update()
 
     # Configuración de la página
@@ -238,7 +233,7 @@ def interfaz_compra(page: ft.Page, caja_inicial):
         ft.Text("Ingrese el tipo de cambio:", size=30, color=ft.Colors.BLACK),
     ]
 
-    monedas = ["Dolar", "Peso Argentino", "Euro", "Chileno"]
+    monedas = ["Dolar", "Pesos Argentinos", "Euro", "Chileno"]
 
     datos = [
         ft.Dropdown(label="Opciones", options=[ft.dropdown.Option(moneda) for moneda in monedas], border_radius=8),
@@ -263,6 +258,7 @@ def interfaz_compra(page: ft.Page, caja_inicial):
 #Interfaz confirmar venta
 def interfaz_confirmar_venta(page: ft.Page,moneda_vendida,cantidad_vendida,moneda_recibida,tipo_cambio,cantidad_recibida,caja_inicial):
     def enviar(e):
+        print(f'{caja_inicial.datos()}')
         page.controls.clear()  # Limpiar los controles previos
         main(page)
         page.update()
@@ -322,6 +318,7 @@ def interfaz_confirmar_venta(page: ft.Page,moneda_vendida,cantidad_vendida,moned
 #interfaz_confirmar_venta
 def interfaz_confirmar_compra(page: ft.Page, moneda_comprada,cantidad_comprada,moneda_vendida,tipo_cambio,cantidad_recibida,caja_inicial):
     def enviar(e):
+        print(f'{caja_inicial.datos()}')
         page.controls.clear()  # Limpiar los controles previos
         main(page)
         page.update()
