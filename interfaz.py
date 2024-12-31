@@ -1,15 +1,42 @@
 import flet as ft
+class CajaInicial:
+    def __init__(self, caja):
+        self.caja = caja
+    
+    def operacion_venta(self, moneda_entregada, cantidad_entregada, moneda_recibida, tipo_de_cambio):
+        dinero_total = tipo_de_cambio * cantidad_entregada
+        return moneda_entregada, cantidad_entregada, moneda_recibida, dinero_total
+    
+    def operacion_compra(self, moneda_recibida, cantidad_comprada, moneda_entregada, tipo_de_cambio):
+        cantidad_entregada = cantidad_comprada * tipo_de_cambio
+        return moneda_recibida, cantidad_comprada, moneda_entregada, cantidad_entregada
+    
+    def cambio_caja_compra(self, datos):
+        if datos[0] in self.caja:
+            self.caja[datos[0]] += datos[1]
+        if datos[2] in self.caja:
+            self.caja[datos[2]] -= datos[3]
+    
+    def cambio_caja_venta(self, datos):
+        if datos[0] in self.caja:
+            self.caja[datos[0]] -= datos[1]
+        if datos[2] in self.caja:
+            self.caja[datos[2]] += datos[3]
+        
+
+
 
 # Interfaz principal
 def main(page: ft.Page):
+    caja_inicial = CajaInicial({"Dolar": 10000, "Euros": 10000, "Pesos Argentinos": 10000})
     def ir_a_compra(e):
         page.controls.clear()  # Limpiar los controles previos
-        interfaz_compra(page)  # Cargar la interfaz de compra
+        interfaz_compra(page,caja_inicial)  # Cargar la interfaz de compra
         page.update()
 
     def ir_a_venta(e):
         page.controls.clear()  # Limpiar los controles previos
-        interfaz_venta(page)  # Cargar la interfaz de venta
+        interfaz_venta(page, caja_inicial)  # Cargar la interfaz de venta
         page.update()
 
     # Configuración de la página
@@ -58,11 +85,41 @@ def main(page: ft.Page):
     page.add(contenido)
 
 # Interfaz venta
-def interfaz_venta(page: ft.Page):
+def interfaz_venta(page: ft.Page, caja_inicial):
+    def venta(moneda_vendida,cantidad_vendida,moneda_recibida,tipo_cambio):
+        caja_final = caja_inicial.operacion_venta(moneda_vendida,cantidad_vendida,moneda_recibida,tipo_cambio)
+        caja_inicial.cambio_caja_venta(caja_final)
+        return caja_final[3]
     def ir_a_confirmacion(e):
+        # Obtener los valores de los inputs antes de continuar
+        moneda_vendida = datos[0].value # Dropdown de moneda comprada
+        try:
+            cantidad_vendida = float(datos[1].value)  # Convertir cantidad comprada a int
+        except ValueError:
+            cantidad_vendida = None  # Si no es un número válido, lo dejamos como None o manejamos el error
+
+        moneda_recibida = datos[2].value # Dropdown de moneda dada
+        try:
+            tipo_cambio = float(datos[3].value)  # Convertir tipo de cambio a int
+        except ValueError:
+            tipo_cambio = None  # Si no es un número válido, lo dejamos como None o manejamos el error
+        if tipo_cambio and moneda_recibida and moneda_vendida and cantidad_vendida:
+            cantidad_recibida = venta(moneda_vendida,cantidad_vendida,moneda_recibida,tipo_cambio)
+            page.controls.clear()  # Limpiar los controles previos
+            interfaz_confirmar_venta(page,moneda_vendida,cantidad_vendida,moneda_recibida,tipo_cambio,cantidad_recibida,caja_inicial)
+            page.update()
+
+
+
+        # Mostrar los valores en la consola (o procesarlos)
+        print(f"Moneda comprada: {moneda_comprada}")
+        print(f"Cantidad comprada: {cantidad_comprada}")
+        print(f"Moneda dada: {moneda_dada}")
+        print(f"Tipo de cambio: {tipo_cambio}")
         page.controls.clear()  # Limpiar los controles previos
         interfaz_confirmar_venta(page)
         page.update()
+
 
     def retroceder(e):
         page.controls.clear()  # Limpiar los controles previos
@@ -99,7 +156,7 @@ def interfaz_venta(page: ft.Page):
         ft.Text("Ingrese el tipo de cambio:", size=30, color=ft.Colors.BLACK),
     ]
 
-    monedas = ["Dólar", "Peso Argentino", "Euro", "Chileno"]
+    monedas = ["Dolar", "Peso Argentino", "Euro", "Chileno"]
 
     datos = [
         ft.Dropdown(label="Opciones", options=[ft.dropdown.Option(moneda) for moneda in monedas], border_radius=8),
@@ -122,15 +179,33 @@ def interfaz_venta(page: ft.Page):
     page.add(texto, ft.Container(height=30), fila_todos, ft.Container(height=30), boton_enviar, back_container)
 
 # Interfaz compra
-def interfaz_compra(page: ft.Page):
+def interfaz_compra(page: ft.Page, caja_inicial):
+    def compra(moneda_comprada,cantidad_comprada,moneda_vendida,tipo_cambio):
+        caja_final = caja_inicial.operacion_compra(moneda_comprada,cantidad_comprada,moneda_vendida,tipo_cambio)
+        caja_inicial.cambio_caja_venta(caja_final)
+        return caja_final[3]
     def ir_a_confirmacion(e):
-        page.controls.clear()  # Limpiar los controles previos
-        interfaz_confirmar_compra(page)
-        page.update()
+        # Obtener los valores de los inputs antes de continuar
+        moneda_comprada = datos[0].value  # Dropdown de moneda comprada
+        try:
+            cantidad_comprada = float(datos[1].value)  # Convertir cantidad comprada a int
+        except ValueError:
+            cantidad_comprada = None  # Si no es un número válido, lo dejamos como None o manejamos el error
+
+        moneda_vendida = datos[2].value # Dropdown de moneda dada
+        try:
+            tipo_cambio = float(datos[3].value)  # Convertir tipo de cambio a int
+        except ValueError:
+            tipo_cambio = None  # Si no es un número válido, lo dejamos como None o manejamos el error
+        if tipo_cambio and moneda_comprada and cantidad_comprada and moneda_vendida:
+            cantidad_recibida = compra(moneda_comprada,cantidad_comprada,moneda_vendida,tipo_cambio)
+            page.controls.clear()  # Limpiar los controles previos
+            interfaz_confirmar_compra(page, moneda_comprada,cantidad_comprada,moneda_vendida,tipo_cambio,cantidad_recibida,caja_inicial)
+            page.update()
 
     def retroceder(e):
         page.controls.clear()  # Limpiar los controles previos
-        main(page)
+        main(page,caja_inicial)
         page.update()
 
     # Configuración de la página
@@ -163,7 +238,7 @@ def interfaz_compra(page: ft.Page):
         ft.Text("Ingrese el tipo de cambio:", size=30, color=ft.Colors.BLACK),
     ]
 
-    monedas = ["Dólar", "Peso Argentino", "Euro", "Chileno"]
+    monedas = ["Dolar", "Peso Argentino", "Euro", "Chileno"]
 
     datos = [
         ft.Dropdown(label="Opciones", options=[ft.dropdown.Option(moneda) for moneda in monedas], border_radius=8),
@@ -185,7 +260,8 @@ def interfaz_compra(page: ft.Page):
     # Añadir elementos a la página
     page.add(texto, ft.Container(height=30), fila_todos, ft.Container(height=30), boton_enviar, back_container)
 
-def interfaz_confirmar_venta(page: ft.Page):
+#Interfaz confirmar venta
+def interfaz_confirmar_venta(page: ft.Page,moneda_vendida,cantidad_vendida,moneda_recibida,tipo_cambio,cantidad_recibida,caja_inicial):
     def enviar(e):
         page.controls.clear()  # Limpiar los controles previos
         main(page)
@@ -193,7 +269,7 @@ def interfaz_confirmar_venta(page: ft.Page):
 
     def retroceder(e):
         page.controls.clear()  # Limpiar los controles previos
-        interfaz_venta(page)
+        interfaz_venta(page,caja_inicial)
 
     # Configuración de la página
     page.bgcolor = ft.Colors.BLUE_GREY_50
@@ -203,14 +279,14 @@ def interfaz_confirmar_venta(page: ft.Page):
 
     # Título principal
     texto = ft.Text("Confirme si son correctos los siguientes datos:", size=50, color=ft.Colors.BLACK, weight=ft.FontWeight.BOLD)
-
+    # moneda_vendida,cantidad_vendida,moneda_recibida,tipo_cambio,cantidad_recibida
     # Texto informativo para cada campo
     textos = [
-        ft.Text("Moneda vendida:", size=30, color=ft.Colors.BLACK),
-        ft.Text("Cantidad vendida:", size=30, color=ft.Colors.BLACK),
-        ft.Text("Moneda recibida:", size=30, color=ft.Colors.BLACK),
-        ft.Text("Tipo de cambio:", size=30, color=ft.Colors.BLACK),
-        ft.Text("Cantidad recibida:", size=30, color=ft.Colors.BLACK)
+        ft.Text(f"Moneda vendida: {moneda_vendida}", size=30, color=ft.Colors.BLACK),
+        ft.Text(f"Cantidad vendida: {cantidad_vendida}", size=30, color=ft.Colors.BLACK),
+        ft.Text(f"Moneda recibida: {moneda_recibida}", size=30, color=ft.Colors.BLACK),
+        ft.Text(f"Tipo de cambio: {tipo_cambio}", size=30, color=ft.Colors.BLACK),
+        ft.Text(f"Cantidad recibida: {cantidad_recibida}", size=30, color=ft.Colors.BLACK)
     ]
 
     # Botón de confirmación
@@ -243,7 +319,8 @@ def interfaz_confirmar_venta(page: ft.Page):
     # Añadir la columna a la página
     page.add(textos_columnas,back_container)
 
-def interfaz_confirmar_compra(page: ft.Page):
+#interfaz_confirmar_venta
+def interfaz_confirmar_compra(page: ft.Page, moneda_comprada,cantidad_comprada,moneda_vendida,tipo_cambio,cantidad_recibida,caja_inicial):
     def enviar(e):
         page.controls.clear()  # Limpiar los controles previos
         main(page)
@@ -251,7 +328,7 @@ def interfaz_confirmar_compra(page: ft.Page):
 
     def retroceder(e):
         page.controls.clear()  # Limpiar los controles previos
-        interfaz_compra(page)
+        interfaz_compra(page,caja_inicial)
 
     # Configuración de la página
     page.bgcolor = ft.Colors.BLUE_GREY_50
@@ -264,11 +341,11 @@ def interfaz_confirmar_compra(page: ft.Page):
 
     # Texto informativo para cada campo
     textos = [
-        ft.Text("Moneda comprada:", size=30, color=ft.Colors.BLACK),
-        ft.Text("Cantidad comprada:", size=30, color=ft.Colors.BLACK),
-        ft.Text("Moneda recibida:", size=30, color=ft.Colors.BLACK),
-        ft.Text("Tipo de cambio:", size=30, color=ft.Colors.BLACK),
-        ft.Text("Cantidad dada:", size=30, color=ft.Colors.BLACK)
+        ft.Text(f"Moneda comprada: {moneda_comprada}", size=30, color=ft.Colors.BLACK),
+        ft.Text(f"Cantidad comprada: {cantidad_comprada}", size=30, color=ft.Colors.BLACK),
+        ft.Text(f"Moneda entregada a cambio: {moneda_vendida}", size=30, color=ft.Colors.BLACK),
+        ft.Text(f"Tipo de cambio: {tipo_cambio}", size=30, color=ft.Colors.BLACK),
+        ft.Text(f"Cantidad dada: {cantidad_recibida}", size=30, color=ft.Colors.BLACK)
     ]
 
     # Botón de confirmación
@@ -300,5 +377,7 @@ def interfaz_confirmar_compra(page: ft.Page):
 
     # Añadir la columna a la página
     page.add(textos_columnas,back_container)
+
+
 
 ft.app(target=main)
