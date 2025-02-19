@@ -1,4 +1,6 @@
 import flet as ft
+import sqlite3
+import datetime
 
 caja_inicial = None
 
@@ -9,25 +11,48 @@ class CajaInicial:
     def operacion_venta(self, moneda_entregada, cantidad_entregada, moneda_recibida, tipo_de_cambio):
         # Calcula el dinero total a recibir por la venta
         dinero_total = round(tipo_de_cambio * cantidad_entregada, 2)
-        return moneda_entregada, cantidad_entregada, moneda_recibida, dinero_total
+        return dinero_total
     
     def operacion_compra(self, moneda_comprada, cantidad_comprada, moneda_vendida, tipo_de_cambio):
         # Calcula la cantidad de dinero que se entrega por la compra
         cantidad_entregada = round(cantidad_comprada * tipo_de_cambio,2)
-        return moneda_comprada, cantidad_comprada, moneda_vendida, cantidad_entregada
+        return cantidad_entregada
     
     def cambio_caja_compra(self, datos):
         if datos[0] in self.caja:
             self.caja[datos[0]] += datos[1]
         if datos[2] in self.caja:
             self.caja[datos[2]] -= datos[3]
-    
+        fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        conexion = sqlite3.connect("base-casa-de-cambio.db")
+
+        cursor = conexion.cursor()
+        cursor.execute(
+            "INSERT INTO transacciones(fecha,tipo_transaccion,moneda_origen,cantidad_origen,moneda_destino,cantidad_destino,tipo_cambio) VALUES(?, ?, ?, ?, ?, ?, ?)",
+            (fecha_actual, 'compra', datos[0], datos[1], datos[2], datos[3], datos[4])
+        )
+        conexion.commit()
+        conexion.close()
+
     def cambio_caja_venta(self, datos):
         if datos[0] in self.caja:
             self.caja[datos[0]] -= datos[1]
         if datos[2] in self.caja:
             self.caja[datos[2]] += datos[3]
-        
+    
+        fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        conexion = sqlite3.connect("base-casa-de-cambio.db")
+
+        cursor = conexion.cursor()
+        cursor.execute(
+            "INSERT INTO transacciones(fecha,tipo_transaccion,moneda_origen,cantidad_origen,moneda_destino,cantidad_destino,tipo_cambio) VALUES(?, ?, ?, ?, ?, ?, ?)",
+            (fecha_actual, 'venta', datos[0], datos[1], datos[2], datos[3], datos[4])
+        )
+        conexion.commit()
+        conexion.close()
+    
     def datos(self):
         return f'Caja actual: {self.caja}'
 
@@ -73,8 +98,7 @@ def main(page: ft.Page):
 def interfaz_venta(page: ft.Page):
     def procesar_venta(moneda_vendida, cantidad_vendida, moneda_recibida, tipo_cambio):
         datos = caja_inicial.operacion_venta(moneda_vendida, cantidad_vendida, moneda_recibida, tipo_cambio)
-        caja_inicial.cambio_caja_venta(datos)
-        return datos[3]
+        return datos
 
     def mostrar_snackbar(mensaje):
         snack_bar = ft.SnackBar(content=ft.Text(mensaje))
@@ -147,8 +171,7 @@ def interfaz_venta(page: ft.Page):
 def interfaz_compra(page: ft.Page):
     def procesar_compra(moneda_comprada, cantidad_comprada, moneda_vendida, tipo_cambio):
         datos = caja_inicial.operacion_compra(moneda_comprada, cantidad_comprada, moneda_vendida, tipo_cambio)
-        caja_inicial.cambio_caja_compra(datos)
-        return datos[3]
+        return datos
 
     def mostrar_snackbar(mensaje):
         snack_bar = ft.SnackBar(content=ft.Text(mensaje))
@@ -220,6 +243,7 @@ def interfaz_compra(page: ft.Page):
 # Función para confirmar la venta
 def interfaz_confirmar_venta(page: ft.Page, moneda_vendida, cantidad_vendida, moneda_recibida, tipo_cambio, cantidad_recibida):
     def enviar(e):
+        caja_inicial.cambio_caja_venta((moneda_vendida,cantidad_vendida,moneda_recibida,cantidad_recibida,tipo_cambio))
         print(f'{caja_inicial.datos()}')
         page.controls.clear()
         main(page)
@@ -248,6 +272,7 @@ def interfaz_confirmar_venta(page: ft.Page, moneda_vendida, cantidad_vendida, mo
 # Función para confirmar la compra
 def interfaz_confirmar_compra(page: ft.Page, moneda_comprada, cantidad_comprada, moneda_vendida, tipo_cambio, cantidad_entregada):
     def enviar(e):
+        caja_inicial.cambio_caja_compra((moneda_comprada, cantidad_comprada, moneda_vendida,cantidad_entregada,tipo_cambio))
         print(f'{caja_inicial.datos()}')
         page.controls.clear()
         main(page)
