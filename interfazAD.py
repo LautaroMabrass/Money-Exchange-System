@@ -5,7 +5,7 @@ def main(page: ft.Page):
     page.bgcolor = ft.Colors.BLUE_GREY_50
     page.title = "Casa de Cambio"
     page.padding = 20
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER  # Asegura alineación horizontal en la página
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
 
     texto = ft.Text(
         "Bienvenido",
@@ -44,7 +44,6 @@ def main(page: ft.Page):
         filas = cursor.fetchall()
         conexion.close()
 
-        # Limpiar la tabla antes de agregar nuevas filas
         data_table.rows.clear()
 
         # Agregar los datos a la tabla
@@ -64,7 +63,10 @@ def main(page: ft.Page):
             data_table.rows.append(nueva_fila)
         
         page.update()
-
+    def ingreso_dinero(e):
+        return
+    def egreso_dinero(e):
+        return
     recargar = ft.FilledButton(
         "Recargar",
         on_click=refrescarData,
@@ -72,9 +74,22 @@ def main(page: ft.Page):
         height=60,
         style=ft.ButtonStyle(text_style=ft.TextStyle(size=30))
     )
-
+    ingreso = ft.FilledButton(
+        "Ingresar de dinero",
+        on_click=ingreso_dinero,
+        width=300,
+        height=60,
+        style=ft.ButtonStyle(text_style=ft.TextStyle(size=30))
+    )    
+    egreso = ft.FilledButton(
+        "Egreso de dinero",
+        on_click=egreso_dinero,
+        width=300,
+        height=60,
+        style=ft.ButtonStyle(text_style=ft.TextStyle(size=30))
+    )  
     texto_fila = ft.Row([texto], alignment=ft.MainAxisAlignment.CENTER)
-    boton_fila = ft.Row([recargar], alignment=ft.MainAxisAlignment.CENTER)
+    boton_fila = ft.Row([recargar,ingreso,egreso], alignment=ft.MainAxisAlignment.CENTER)
 
     contenido = ft.Column(
         controls=[texto_fila, boton_fila, data_table],
