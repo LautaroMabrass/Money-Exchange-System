@@ -1,70 +1,35 @@
 import flet as ft
 import sqlite3
 import datetime
-
-caja_inicial = None
-
-class CajaInicial:
-    def __init__(self, caja):
-        self.caja = caja
     
-    def operacion_venta(self, moneda_entregada, cantidad_entregada, moneda_recibida, tipo_de_cambio):
+def operacion_venta(moneda_entregada, cantidad_entregada, moneda_recibida, tipo_de_cambio):
         # Calcula el dinero total a recibir por la venta
-        dinero_total = round(tipo_de_cambio * cantidad_entregada, 2)
-        return dinero_total
+        cantidad_recibida = round(tipo_de_cambio * cantidad_entregada, 2)
+        return cantidad_recibida
     
-    def operacion_compra(self, moneda_comprada, cantidad_comprada, moneda_vendida, tipo_de_cambio):
+def operacion_compra(moneda_comprada, cantidad_comprada, moneda_vendida, tipo_de_cambio):
         # Calcula la cantidad de dinero que se entrega por la compra
-        cantidad_entregada = round(cantidad_comprada * tipo_de_cambio,2)
+        cantidad_entregada = round(cantidad_comprada / tipo_de_cambio,2)
         return cantidad_entregada
     
-    def cambio_caja_compra(self, datos):
-        if datos[0] in self.caja:
-            self.caja[datos[0]] += datos[1]
-        if datos[2] in self.caja:
-            self.caja[datos[2]] -= datos[3]
-        fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def cargar_datos(datos):
+    fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        conexion = sqlite3.connect("base-casa-de-cambio.db")
+    conexion = sqlite3.connect("base-casa-de-cambio.db")
 
-        cursor = conexion.cursor()
-        cursor.execute(
-            "INSERT INTO transacciones(fecha,tipo_transaccion,moneda_origen,cantidad_origen,moneda_destino,cantidad_destino,tipo_cambio) VALUES(?, ?, ?, ?, ?, ?, ?)",
-            (fecha_actual, 'compra', datos[0], datos[1], datos[2], datos[3], datos[4])
-        )
-        conexion.commit()
-        conexion.close()
+    cursor = conexion.cursor()
+    cursor.execute(
+        "INSERT INTO transacciones(fecha,tipo_transaccion,moneda_origen,cantidad_origen,moneda_destino,cantidad_destino,tipo_cambio) VALUES(?, ?, ?, ?, ?, ?, ?)",
+        (fecha_actual, 'compra', datos[0], datos[1], datos[2], datos[3], datos[4])
+    )
+    conexion.commit()
+    conexion.close()
 
-    def cambio_caja_venta(self, datos):
-        if datos[0] in self.caja:
-            self.caja[datos[0]] -= datos[1]
-        if datos[2] in self.caja:
-            self.caja[datos[2]] += datos[3]
-    
-        fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        conexion = sqlite3.connect("base-casa-de-cambio.db")
-
-        cursor = conexion.cursor()
-        cursor.execute(
-            "INSERT INTO transacciones(fecha,tipo_transaccion,moneda_origen,cantidad_origen,moneda_destino,cantidad_destino,tipo_cambio) VALUES(?, ?, ?, ?, ?, ?, ?)",
-            (fecha_actual, 'venta', datos[0], datos[1], datos[2], datos[3], datos[4])
-        )
-        conexion.commit()
-        conexion.close()
-    
-    def datos(self):
-        return f'Caja actual: {self.caja}'
 
 
 # Función principal
 def main(page: ft.Page):
-    global caja_inicial 
-
-    if caja_inicial is None:    
-        caja_inicial = CajaInicial({"Dolar": 100, "Euros": 100, "Pesos Argentinos": 100, "Chileno" : 100})
-        
-    
+            
     def ir_a_compra(e):
         page.controls.clear()
         interfaz_compra(page)
@@ -97,8 +62,7 @@ def main(page: ft.Page):
 # Función para la interfaz de venta
 def interfaz_venta(page: ft.Page):
     def procesar_venta(moneda_vendida, cantidad_vendida, moneda_recibida, tipo_cambio):
-        datos = caja_inicial.operacion_venta(moneda_vendida, cantidad_vendida, moneda_recibida, tipo_cambio)
-        return datos
+        return operacion_venta(moneda_vendida, cantidad_vendida, moneda_recibida, tipo_cambio)
 
     def mostrar_snackbar(mensaje):
         snack_bar = ft.SnackBar(content=ft.Text(mensaje))
@@ -170,8 +134,7 @@ def interfaz_venta(page: ft.Page):
 # Función para la interfaz de compra
 def interfaz_compra(page: ft.Page):
     def procesar_compra(moneda_comprada, cantidad_comprada, moneda_vendida, tipo_cambio):
-        datos = caja_inicial.operacion_compra(moneda_comprada, cantidad_comprada, moneda_vendida, tipo_cambio)
-        return datos
+        return operacion_compra(moneda_comprada, cantidad_comprada, moneda_vendida, tipo_cambio)
 
     def mostrar_snackbar(mensaje):
         snack_bar = ft.SnackBar(content=ft.Text(mensaje))
@@ -243,8 +206,7 @@ def interfaz_compra(page: ft.Page):
 # Función para confirmar la venta
 def interfaz_confirmar_venta(page: ft.Page, moneda_vendida, cantidad_vendida, moneda_recibida, tipo_cambio, cantidad_recibida):
     def enviar(e):
-        caja_inicial.cambio_caja_venta((moneda_vendida,cantidad_vendida,moneda_recibida,cantidad_recibida,tipo_cambio))
-        print(f'{caja_inicial.datos()}')
+        cargar_datos([moneda_vendida,cantidad_vendida,moneda_recibida,cantidad_recibida,tipo_cambio])
         page.controls.clear()
         main(page)
         page.update()
@@ -272,8 +234,7 @@ def interfaz_confirmar_venta(page: ft.Page, moneda_vendida, cantidad_vendida, mo
 # Función para confirmar la compra
 def interfaz_confirmar_compra(page: ft.Page, moneda_comprada, cantidad_comprada, moneda_vendida, tipo_cambio, cantidad_entregada):
     def enviar(e):
-        caja_inicial.cambio_caja_compra((moneda_comprada, cantidad_comprada, moneda_vendida,cantidad_entregada,tipo_cambio))
-        print(f'{caja_inicial.datos()}')
+        cargar_datos([moneda_comprada, cantidad_comprada, moneda_vendida,cantidad_entregada,tipo_cambio])
         page.controls.clear()
         main(page)
         page.update()
