@@ -11,9 +11,6 @@ This repository contains a **Currency Exchange System**, developed using **Flet*
 - Supports buying and selling of foreign currencies.  
 - Displays exchange rates and transaction results.  
 
-### OOP-Based Architecture  
-- Designed using **classes and functions** for flexibility and scalability.  
-
 ## Main Functionalities  
 
 - **Transaction Selection** – Choose between buying or selling currency.  
