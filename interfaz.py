@@ -7,19 +7,38 @@ def operacion_venta(moneda_entregada, cantidad_entregada, moneda_recibida, tipo_
     return cantidad_recibida
 
 def operacion_compra(moneda_comprada, cantidad_comprada, moneda_vendida, tipo_de_cambio):
-    cantidad_entregada = round(cantidad_comprada / tipo_de_cambio, 2)
+    cantidad_entregada = round(cantidad_comprada * tipo_de_cambio, 2)
     return cantidad_entregada
 
-def cargar_datos(datos):
+def cargar_datos(tipo_transaccion, moneda_origen, cantidad_origen, moneda_destino, cantidad_destino, tipo_cambio):
     fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    moneda_a_columna = {
+        "Dolar": "usd",
+        "Pesos Argentinos": "ars",
+        "Euros": "eur",
+        "Chileno": "clp"
+    }
     conexion = sqlite3.connect("base-casa-de-cambio.db")
     cursor = conexion.cursor()
-    cursor.execute(
-        "INSERT INTO transacciones(fecha, tipo_transaccion, moneda_origen, cantidad_origen, moneda_destino, cantidad_destino, tipo_cambio) VALUES(?, ?, ?, ?, ?, ?, ?)",
-        (fecha_actual, 'compra', datos[0], datos[1], datos[2], datos[3], datos[4])
-    )
-    conexion.commit()
-    conexion.close()
+    try:
+        cursor.execute("BEGIN")
+        cursor.execute(
+            "INSERT INTO transacciones(fecha, tipo_transaccion, moneda_origen, cantidad_origen, moneda_destino, cantidad_destino, tipo_cambio) VALUES(?, ?, ?, ?, ?, ?, ?)",
+            (fecha_actual, tipo_transaccion, moneda_origen, cantidad_origen, moneda_destino, cantidad_destino, tipo_cambio)
+        )
+        columna_origen = moneda_a_columna[moneda_origen]
+        columna_destino = moneda_a_columna[moneda_destino]
+        # Ajuste para la perspectiva del usuario
+        cursor.execute(
+            f"UPDATE caja SET {columna_origen} = {columna_origen} - ?, {columna_destino} = {columna_destino} + ?",
+            (cantidad_origen, cantidad_destino)
+        )
+        conexion.commit()
+    except Exception as e:
+        conexion.rollback()
+        print(f"Error: {e}")
+    finally:
+        conexion.close()
 
 # Función principal
 def main(page: ft.Page):
@@ -315,7 +334,7 @@ def interfaz_compra(page: ft.Page):
 # Confirmación de venta
 def interfaz_confirmar_venta(page: ft.Page, moneda_vendida, cantidad_vendida, moneda_recibida, tipo_cambio, cantidad_recibida):
     def enviar(e):
-        cargar_datos([moneda_vendida, cantidad_vendida, moneda_recibida, cantidad_recibida, tipo_cambio])
+        cargar_datos('venta', moneda_vendida, cantidad_vendida, moneda_recibida, cantidad_recibida, tipo_cambio)
         page.controls.clear()
         main(page)
         page.update()
@@ -366,7 +385,7 @@ def interfaz_confirmar_venta(page: ft.Page, moneda_vendida, cantidad_vendida, mo
 # Confirmación de compra
 def interfaz_confirmar_compra(page: ft.Page, moneda_comprada, cantidad_comprada, moneda_vendida, tipo_cambio, cantidad_entregada):
     def enviar(e):
-        cargar_datos([moneda_comprada, cantidad_comprada, moneda_vendida, cantidad_entregada, tipo_cambio])
+        cargar_datos('compra', moneda_vendida, cantidad_entregada, moneda_comprada, cantidad_comprada, tipo_cambio)
         page.controls.clear()
         main(page)
         page.update()
