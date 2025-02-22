@@ -1,14 +1,23 @@
 import flet as ft
-import sqlite3
+import mysql.connector
+import db_config
 from datetime import datetime
 
 def cargar_saldos():
-    conn = sqlite3.connect('base-casa-de-cambio.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT USD, ARS, CLP, EUR FROM caja ORDER BY id DESC LIMIT 1')
-    saldos = cursor.fetchone()
-    conn.close()
-    return {'USD': saldos[0], 'ARS': saldos[1], 'CLP': saldos[2], 'EUR': saldos[3]}
+    try:
+        conn = mysql.connector.connect(**db_config.DB_CONFIG)
+        cursor = conn.cursor()
+        cursor.execute('SELECT USD, ARS, CLP, EUR FROM caja ORDER BY id DESC LIMIT 1')
+        saldos = cursor.fetchone()
+        if saldos is None:
+            return {'USD': 0, 'ARS': 0, 'CLP': 0, 'EUR': 0}
+        return {'USD': saldos[0], 'ARS': saldos[1], 'CLP': saldos[2], 'EUR': saldos[3]}
+    except mysql.connector.Error as e:
+        print(f"Error al cargar saldos: {e}")
+        return {'USD': 0, 'ARS': 0, 'CLP': 0, 'EUR': 0}
+    finally:
+        cursor.close()
+        conn.close()
 
 def main(page: ft.Page):
     page.bgcolor = ft.Colors.INDIGO_50
@@ -121,7 +130,6 @@ def caja(page: ft.Page):
         egresar_dinero_view(page)
         page.update()
 
-    # Cambiamos la acción del botón "Modificar" para redirigir a la nueva interfaz
     def ir_modificar_todo(e):
         page.controls.clear()
         modificar_caja_view(page)
@@ -236,7 +244,6 @@ def caja(page: ft.Page):
     page.add(contenido)
 
 def modificar_caja_view(page: ft.Page):
-    # Nueva interfaz para modificar todos los saldos
     saldos = cargar_saldos()
     usd = ft.TextField(label="Dólares", width=200, border_color=ft.Colors.INDIGO_700, value=str(saldos['USD']))
     ars = ft.TextField(label="Pesos Argentinos", width=200, border_color=ft.Colors.INDIGO_700, value=str(saldos['ARS']))
@@ -253,37 +260,54 @@ def modificar_caja_view(page: ft.Page):
             }
             if any(val < 0 for val in nuevos_saldos.values()):
                 raise ValueError("Los montos no pueden ser negativos")
-            conn = sqlite3.connect('base-casa-de-cambio.db')
+            conn = mysql.connector.connect(**db_config.DB_CONFIG)
             cursor = conn.cursor()
-            saldos_anteriores = cargar_saldos()
-            cursor.execute('UPDATE caja SET USD = ?, ARS = ?, CLP = ?, EUR = ? WHERE id = (SELECT MAX(id) FROM caja)',
-                           (nuevos_saldos['USD'], nuevos_saldos['ARS'], nuevos_saldos['CLP'], nuevos_saldos['EUR']))
-            conn.commit()
-            saldos_nuevos = cargar_saldos()
-            cursor.execute('''
-                INSERT INTO operaciones_caja (
-                    fecha, tipo_operacion, moneda, cantidad,
-                    saldo_anterior_USD, saldo_anterior_ARS, saldo_anterior_CLP, saldo_anterior_EUR,
-                    saldo_nuevo_USD, saldo_nuevo_ARS, saldo_nuevo_CLP, saldo_nuevo_EUR
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'modificacion',
-                None,
-                None,
-                saldos_anteriores['USD'], saldos_anteriores['ARS'], saldos_anteriores['CLP'], saldos_anteriores['EUR'],
-                saldos_nuevos['USD'], saldos_nuevos['ARS'], saldos_nuevos['CLP'], saldos_nuevos['EUR']
-            ))
-            conn.commit()
-            conn.close()
-
-            page.controls.clear()
-            caja(page)
-            page.update()
+            # Obtener el id máximo primero
+            cursor.execute('SELECT MAX(id) FROM caja')
+            max_id = cursor.fetchone()[0]
+            if max_id is not None:
+                # Actualizar la tabla con el id obtenido
+                saldos_anteriores = cargar_saldos()
+                cursor.execute('UPDATE caja SET USD = %s, ARS = %s, CLP = %s, EUR = %s WHERE id = %s',
+                               (nuevos_saldos['USD'], nuevos_saldos['ARS'], nuevos_saldos['CLP'], nuevos_saldos['EUR'], max_id))
+                conn.commit()
+                saldos_nuevos = cargar_saldos()
+                cursor.execute('''
+                    INSERT INTO operaciones_caja (
+                        fecha, tipo_operacion, moneda, cantidad,
+                        saldo_anterior_USD, saldo_anterior_ARS, saldo_anterior_CLP, saldo_anterior_EUR,
+                        saldo_nuevo_USD, saldo_nuevo_ARS, saldo_nuevo_CLP, saldo_nuevo_EUR
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ''', (
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'modificacion',
+                    None,
+                    None,
+                    saldos_anteriores['USD'], saldos_anteriores['ARS'], saldos_anteriores['CLP'], saldos_anteriores['EUR'],
+                    saldos_nuevos['USD'], saldos_nuevos['ARS'], saldos_nuevos['CLP'], saldos_nuevos['EUR']
+                ))
+                conn.commit()
+                page.controls.clear()
+                caja(page)
+                page.update()
+            else:
+                snack_bar = ft.SnackBar(ft.Text("No hay registros en la tabla caja para modificar"))
+                page.overlay.append(snack_bar)
+                snack_bar.open = True
+                page.update()
         except ValueError as ve:
-            page.snack_bar = ft.SnackBar(ft.Text(str(ve)))
-            page.snack_bar.open = True
+            snack_bar = ft.SnackBar(ft.Text(str(ve)))
+            page.overlay.append(snack_bar)
+            snack_bar.open = True
             page.update()
+        except mysql.connector.Error as e:
+            snack_bar = ft.SnackBar(ft.Text(f"Error en la base de datos: {e}"))
+            page.overlay.append(snack_bar)
+            snack_bar.open = True
+            page.update()
+        finally:
+            cursor.close()
+            conn.close()
 
     confirmar_boton = ft.FilledButton(
         "Confirmar",
@@ -366,40 +390,53 @@ def ingresar_dinero_view(page: ft.Page):
                 monto = float(cantidad.value)
                 if monto <= 0:
                     raise ValueError("El monto debe ser positivo")
-                conn = sqlite3.connect('base-casa-de-cambio.db')
+                conn = mysql.connector.connect(**db_config.DB_CONFIG)
                 cursor = conn.cursor()
-
-                saldos_anteriores = cargar_saldos()
-
-                cursor.execute(f'UPDATE caja SET {moneda.value} = {moneda.value} + ? WHERE id = (SELECT MAX(id) FROM caja)', (monto,))
-                conn.commit()
-
-                saldos_nuevos = cargar_saldos()
-
-                cursor.execute('''
-                    INSERT INTO operaciones_caja (
-                        fecha, tipo_operacion, moneda, cantidad,
-                        saldo_anterior_USD, saldo_anterior_ARS, saldo_anterior_CLP, saldo_anterior_EUR,
-                        saldo_nuevo_USD, saldo_nuevo_ARS, saldo_nuevo_CLP, saldo_nuevo_EUR
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    'ingreso',
-                    moneda.value,
-                    monto,
-                    saldos_anteriores['USD'], saldos_anteriores['ARS'], saldos_anteriores['CLP'], saldos_anteriores['EUR'],
-                    saldos_nuevos['USD'], saldos_nuevos['ARS'], saldos_nuevos['CLP'], saldos_nuevos['EUR']
-                ))
-                conn.commit()
-                conn.close()
-
-                page.controls.clear()
-                caja(page)
-                page.update()
+                # Obtener el id máximo primero
+                cursor.execute('SELECT MAX(id) FROM caja')
+                max_id = cursor.fetchone()[0]
+                if max_id is not None:
+                    saldos_anteriores = cargar_saldos()
+                    # Actualizar la tabla con el id obtenido
+                    cursor.execute(f'UPDATE caja SET {moneda.value} = {moneda.value} + %s WHERE id = %s', (monto, max_id))
+                    conn.commit()
+                    saldos_nuevos = cargar_saldos()
+                    cursor.execute('''
+                        INSERT INTO operaciones_caja (
+                            fecha, tipo_operacion, moneda, cantidad,
+                            saldo_anterior_USD, saldo_anterior_ARS, saldo_anterior_CLP, saldo_anterior_EUR,
+                            saldo_nuevo_USD, saldo_nuevo_ARS, saldo_nuevo_CLP, saldo_nuevo_EUR
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ''', (
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        'ingreso',
+                        moneda.value,
+                        monto,
+                        saldos_anteriores['USD'], saldos_anteriores['ARS'], saldos_anteriores['CLP'], saldos_anteriores['EUR'],
+                        saldos_nuevos['USD'], saldos_nuevos['ARS'], saldos_nuevos['CLP'], saldos_nuevos['EUR']
+                    ))
+                    conn.commit()
+                    page.controls.clear()
+                    caja(page)
+                    page.update()
+                else:
+                    snack_bar = ft.SnackBar(ft.Text("No hay registros en la tabla caja para modificar"))
+                    page.overlay.append(snack_bar)
+                    snack_bar.open = True
+                    page.update()
             except ValueError as ve:
-                page.snack_bar = ft.SnackBar(ft.Text(str(ve)))
-                page.snack_bar.open = True
+                snack_bar = ft.SnackBar(ft.Text(str(ve)))
+                page.overlay.append(snack_bar)
+                snack_bar.open = True
                 page.update()
+            except mysql.connector.Error as e:
+                snack_bar = ft.SnackBar(ft.Text(f"Error en la base de datos: {e}"))
+                page.overlay.append(snack_bar)
+                snack_bar.open = True
+                page.update()
+            finally:
+                cursor.close()
+                conn.close()
 
     def retroceder(e):
         page.controls.clear()
@@ -482,40 +519,53 @@ def egresar_dinero_view(page: ft.Page):
                 saldos = cargar_saldos()
                 if monto > saldos[moneda.value]:
                     raise ValueError("Fondos insuficientes")
-                conn = sqlite3.connect('base-casa-de-cambio.db')
+                conn = mysql.connector.connect(**db_config.DB_CONFIG)
                 cursor = conn.cursor()
-
-                saldos_anteriores = cargar_saldos()
-
-                cursor.execute(f'UPDATE caja SET {moneda.value} = {moneda.value} - ? WHERE id = (SELECT MAX(id) FROM caja)', (monto,))
-                conn.commit()
-
-                saldos_nuevos = cargar_saldos()
-
-                cursor.execute('''
-                    INSERT INTO operaciones_caja (
-                        fecha, tipo_operacion, moneda, cantidad,
-                        saldo_anterior_USD, saldo_anterior_ARS, saldo_anterior_CLP, saldo_anterior_EUR,
-                        saldo_nuevo_USD, saldo_nuevo_ARS, saldo_nuevo_CLP, saldo_nuevo_EUR
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    'egreso',
-                    moneda.value,
-                    monto,
-                    saldos_anteriores['USD'], saldos_anteriores['ARS'], saldos_anteriores['CLP'], saldos_anteriores['EUR'],
-                    saldos_nuevos['USD'], saldos_nuevos['ARS'], saldos_nuevos['CLP'], saldos_nuevos['EUR']
-                ))
-                conn.commit()
-                conn.close()
-
-                page.controls.clear()
-                caja(page)
-                page.update()
+                # Obtener el id máximo primero
+                cursor.execute('SELECT MAX(id) FROM caja')
+                max_id = cursor.fetchone()[0]
+                if max_id is not None:
+                    saldos_anteriores = cargar_saldos()
+                    # Actualizar la tabla con el id obtenido
+                    cursor.execute(f'UPDATE caja SET {moneda.value} = {moneda.value} - %s WHERE id = %s', (monto, max_id))
+                    conn.commit()
+                    saldos_nuevos = cargar_saldos()
+                    cursor.execute('''
+                        INSERT INTO operaciones_caja (
+                            fecha, tipo_operacion, moneda, cantidad,
+                            saldo_anterior_USD, saldo_anterior_ARS, saldo_anterior_CLP, saldo_anterior_EUR,
+                            saldo_nuevo_USD, saldo_nuevo_ARS, saldo_nuevo_CLP, saldo_nuevo_EUR
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ''', (
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        'egreso',
+                        moneda.value,
+                        monto,
+                        saldos_anteriores['USD'], saldos_anteriores['ARS'], saldos_anteriores['CLP'], saldos_anteriores['EUR'],
+                        saldos_nuevos['USD'], saldos_nuevos['ARS'], saldos_nuevos['CLP'], saldos_nuevos['EUR']
+                    ))
+                    conn.commit()
+                    page.controls.clear()
+                    caja(page)
+                    page.update()
+                else:
+                    snack_bar = ft.SnackBar(ft.Text("No hay registros en la tabla caja para modificar"))
+                    page.overlay.append(snack_bar)
+                    snack_bar.open = True
+                    page.update()
             except ValueError as ve:
-                page.snack_bar = ft.SnackBar(ft.Text(str(ve)))
-                page.snack_bar.open = True
+                snack_bar = ft.SnackBar(ft.Text(str(ve)))
+                page.overlay.append(snack_bar)
+                snack_bar.open = True
                 page.update()
+            except mysql.connector.Error as e:
+                snack_bar = ft.SnackBar(ft.Text(f"Error en la base de datos: {e}"))
+                page.overlay.append(snack_bar)
+                snack_bar.open = True
+                page.update()
+            finally:
+                cursor.close()
+                conn.close()
 
     def retroceder(e):
         page.controls.clear()
@@ -600,6 +650,7 @@ def transac(page: ft.Page):
         heading_row_color=ft.Colors.INDIGO_100,
         data_row_color={"": ft.Colors.WHITE, "hovered": ft.Colors.INDIGO_50},
     )
+
     tabla_row = ft.Row(
         controls=[data_table],
         scroll=ft.ScrollMode.AUTO,
@@ -624,11 +675,10 @@ def transac(page: ft.Page):
 
     def refrescarData(e):
         try:
-            conexion = sqlite3.connect("base-casa-de-cambio.db")
-            cursor = conexion.cursor()
+            conn = mysql.connector.connect(**db_config.DB_CONFIG)
+            cursor = conn.cursor()
             cursor.execute("SELECT fecha, tipo_transaccion, moneda_origen, cantidad_origen, moneda_destino, cantidad_destino, tipo_cambio FROM transacciones")
             filas = cursor.fetchall()
-            conexion.close()
             data_table.rows.clear()
             for fila in filas:
                 nueva_fila = ft.DataRow(
@@ -644,10 +694,14 @@ def transac(page: ft.Page):
                 )
                 data_table.rows.append(nueva_fila)
             page.update()
-        except sqlite3.Error:
-            page.snack_bar = ft.SnackBar(ft.Text("Error al cargar transacciones"))
-            page.snack_bar.open = True
+        except mysql.connector.Error as e:
+            snack_bar = ft.SnackBar(ft.Text(f"Error al cargar transacciones: {e}"))
+            page.overlay.append(snack_bar)
+            snack_bar.open = True
             page.update()
+        finally:
+            cursor.close()
+            conn.close()
 
     recargar = ft.FilledButton(
         "Recargar",
@@ -753,11 +807,10 @@ def mostrar_operaciones(page: ft.Page):
 
     def refrescar_operaciones(e):
         try:
-            conn = sqlite3.connect("base-casa-de-cambio.db")
+            conn = mysql.connector.connect(**db_config.DB_CONFIG)
             cursor = conn.cursor()
             cursor.execute("SELECT fecha, tipo_operacion, moneda, cantidad, saldo_anterior_USD, saldo_anterior_ARS, saldo_anterior_CLP, saldo_anterior_EUR, saldo_nuevo_USD, saldo_nuevo_ARS, saldo_nuevo_CLP, saldo_nuevo_EUR FROM operaciones_caja")
             filas = cursor.fetchall()
-            conn.close()
             data_table.rows.clear()
             for fila in filas:
                 nueva_fila = ft.DataRow(
@@ -778,10 +831,14 @@ def mostrar_operaciones(page: ft.Page):
                 )
                 data_table.rows.append(nueva_fila)
             page.update()
-        except sqlite3.Error:
-            page.snack_bar = ft.SnackBar(ft.Text("Error al cargar operaciones"))
-            page.snack_bar.open = True
+        except mysql.connector.Error as e:
+            snack_bar = ft.SnackBar(ft.Text(f"Error al cargar operaciones: {e}"))
+            page.overlay.append(snack_bar)
+            snack_bar.open = True
             page.update()
+        finally:
+            cursor.close()
+            conn.close()
 
     recargar = ft.FilledButton(
         "Recargar",

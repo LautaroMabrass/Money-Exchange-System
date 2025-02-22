@@ -1,5 +1,6 @@
 import flet as ft
-import sqlite3
+import mysql.connector
+import db_config
 import datetime
 
 def operacion_venta(moneda_entregada, cantidad_entregada, moneda_recibida, tipo_de_cambio):
@@ -18,26 +19,39 @@ def cargar_datos(tipo_transaccion, moneda_origen, cantidad_origen, moneda_destin
         "Euros": "eur",
         "Chileno": "clp"
     }
-    conexion = sqlite3.connect("base-casa-de-cambio.db")
-    cursor = conexion.cursor()
     try:
-        cursor.execute("BEGIN")
+        # Conectar a la base de datos MySQL
+        conexion = mysql.connector.connect(**db_config.DB_CONFIG)
+        cursor = conexion.cursor()
+        
+        # Iniciar transacción
+        cursor.execute("START TRANSACTION")
+        
+        # Insertar la transacción
         cursor.execute(
-            "INSERT INTO transacciones(fecha, tipo_transaccion, moneda_origen, cantidad_origen, moneda_destino, cantidad_destino, tipo_cambio) VALUES(?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO transacciones(fecha, tipo_transaccion, moneda_origen, cantidad_origen, moneda_destino, cantidad_destino, tipo_cambio) VALUES(%s, %s, %s, %s, %s, %s, %s)",
             (fecha_actual, tipo_transaccion, moneda_origen, cantidad_origen, moneda_destino, cantidad_destino, tipo_cambio)
         )
+        
+        # Obtener las columnas correspondientes
         columna_origen = moneda_a_columna[moneda_origen]
         columna_destino = moneda_a_columna[moneda_destino]
-        # Ajuste para la perspectiva del usuario
+        
+        # Actualizar la caja
         cursor.execute(
-            f"UPDATE caja SET {columna_origen} = {columna_origen} - ?, {columna_destino} = {columna_destino} + ?",
+            f"UPDATE caja SET {columna_origen} = {columna_origen} - %s, {columna_destino} = {columna_destino} + %s",
             (cantidad_origen, cantidad_destino)
         )
+        
+        # Confirmar la transacción
         conexion.commit()
-    except Exception as e:
+    except mysql.connector.Error as e:
+        # Revertir en caso de error
         conexion.rollback()
         print(f"Error: {e}")
     finally:
+        # Cerrar cursor y conexión
+        cursor.close()
         conexion.close()
 
 # Función principal
