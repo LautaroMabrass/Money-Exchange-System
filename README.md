@@ -1,6 +1,6 @@
 # Currency Exchange System  
 
-This repository contains a **Currency Exchange System**, developed using **Flet** for the graphical interface and **Object-Oriented Programming (OOP)** in Python. The system allows users to perform **currency exchange transactions** efficiently.  
+This repository contains a **Currency Exchange System**, developed using **Flet** for the graphical interface in Python. The system allows users to perform **currency exchange transactions** efficiently.  
 
 ## Features  
 
@@ -10,9 +10,6 @@ This repository contains a **Currency Exchange System**, developed using **Flet*
 ### Currency Exchange Operations  
 - Supports buying and selling of foreign currencies.  
 - Displays exchange rates and transaction results.  
-
-### OOP-Based Architecture  
-- Designed using **classes and functions** for flexibility and scalability.  
 
 ## Main Functionalities  
 
