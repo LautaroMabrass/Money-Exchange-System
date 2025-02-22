@@ -2,3 +2,4 @@ data/
 *.sqlite
 *.sqlite3
 db_config.py
+exe
